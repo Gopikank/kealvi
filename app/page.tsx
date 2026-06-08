@@ -1,14 +1,16 @@
 import QuestionsList from "./questions-list";
+import PollsList from "@/components/PollsList";
 import { getQuestionsPage } from "@/lib/questions";
+import { getPolls } from "@/lib/polls";
 
-// Render on every request (don't cache/prerender) so new questions show up.
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 10;
 
-// Server component — runs only on the server, awaits the data, renders to HTML.
 export default async function Page() {
   const { questions, hasMore } = await getQuestionsPage(0, PAGE_SIZE);
+
+  const polls = await getPolls();
 
   return (
     <main className="mx-auto w-full max-w-2xl px-5 py-10 sm:py-14">
@@ -17,12 +19,24 @@ export default async function Page() {
           <span className="h-1.5 w-1.5 rounded-full bg-brand" />
           Live now
         </span>
-        <h1 className="text-3xl font-semibold tracking-tight">Live Q&amp;A</h1>
+
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Live Q&amp;A
+        </h1>
+
         <p className="mt-1.5 text-sm text-muted">
           Ask a question, upvote the ones you want answered.
         </p>
       </header>
-      <QuestionsList initialQuestions={questions} initialHasMore={hasMore} />
+
+      {/* Poll Section */}
+      <PollsList polls={polls || []} />
+
+      {/* Existing Questions */}
+      <QuestionsList
+        initialQuestions={questions}
+        initialHasMore={hasMore}
+      />
     </main>
   );
 }
