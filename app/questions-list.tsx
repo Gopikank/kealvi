@@ -49,9 +49,10 @@ export default function QuestionsList({
   if (!draft.trim()) return;
 
   setAnswerLoading(true);
+  setAnswer("");
 
   try {
-    // 1. Save question to Supabase
+    // Save question to Supabase
     const saveRes = await fetch("/api/questions", {
       method: "POST",
       headers: {
@@ -62,9 +63,13 @@ export default function QuestionsList({
       }),
     });
 
+    if (!saveRes.ok) {
+      throw new Error("Failed to save question");
+    }
+
     const created = await saveRes.json();
 
-    // 2. Show the new question immediately on the page
+    // Show question immediately
     setQuestions((qs) => [
       {
         ...created,
@@ -73,30 +78,41 @@ export default function QuestionsList({
       ...qs,
     ]);
 
-    // 3. Get AI answer from Groq
-    const aiRes = await fetch("/api/answer", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        question: draft,
-      }),
-    });
+    // Get AI answer
+    try {
+      const aiRes = await fetch("/api/answer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question: draft,
+        }),
+      });
 
-    const aiData = await aiRes.json();
+      const aiData = await aiRes.json();
 
-    // 4. Display answer
-    setAnswer(aiData.answer);
+      console.log("AI Response:", aiData);
 
-    // 5. Clear input box
+      setAnswer(
+        aiData.answer ||
+          aiData.error ||
+          "AI service is unavailable right now."
+      );
+    } catch (aiError) {
+      console.error("AI Error:", aiError);
+      setAnswer(
+        "Question submitted successfully, but AI service is unavailable."
+      );
+    }
+
     setDraft("");
   } catch (error) {
     console.error(error);
-    setAnswer("Failed to generate answer.");
+    setAnswer("Failed to submit question.");
+  } finally {
+    setAnswerLoading(false);
   }
-
-  setAnswerLoading(false);
 }
 
   async function upvote(id: string) {
@@ -195,9 +211,7 @@ export default function QuestionsList({
 
       {/* Questions */}
       <ul className="space-y-3">
-  {[...questions]
-    .sort((a, b) => b.votes - a.votes)
-    .map((q) => (
+        {questions.map((q) => (
           <li
             key={q.id}
             className="flex items-start gap-3 rounded-2xl border bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
