@@ -100,24 +100,38 @@ export default function QuestionsList({
 }
 
   async function upvote(id: string) {
-    // optimistic: assume success, update the UI now
+  // Increase vote and sort immediately
+  setQuestions((qs) =>
+    [...qs]
+      .map((q) =>
+        q.id === id
+          ? { ...q, votes: q.votes + 1 }
+          : q
+      )
+      .sort((a, b) => b.votes - a.votes)
+  );
+
+  const res = await fetch(`/api/questions/${id}/vote`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      voterId: getVoterId(),
+    }),
+  });
+
+  // Roll back if vote fails
+  if (!res.ok) {
     setQuestions((qs) =>
-      qs.map((q) => (q.id === id ? { ...q, votes: q.votes + 1 } : q))
+      [...qs]
+        .map((q) =>
+          q.id === id
+            ? { ...q, votes: q.votes - 1 }
+            : q
+        )
+        .sort((a, b) => b.votes - a.votes)
     );
-
-    const res = await fetch(`/api/questions/${id}/vote`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ voterId: getVoterId() }),
-    });
-
-    // server said no (already voted) — roll back
-    if (!res.ok) {
-      setQuestions((qs) =>
-        qs.map((q) => (q.id === id ? { ...q, votes: q.votes - 1 } : q))
-      );
-    }
   }
+}
 
   async function loadMore() {
     setLoading(true);
@@ -181,7 +195,9 @@ export default function QuestionsList({
 
       {/* Questions */}
       <ul className="space-y-3">
-        {questions.map((q) => (
+  {[...questions]
+    .sort((a, b) => b.votes - a.votes)
+    .map((q) => (
           <li
             key={q.id}
             className="flex items-start gap-3 rounded-2xl border bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
