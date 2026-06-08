@@ -16,13 +16,17 @@ export default function QuestionsList({
   initialQuestions: Question[];
   initialHasMore: boolean;
 }) {
-  const [questions, setQuestions] = useState(initialQuestions);
-  const [draft, setDraft] = useState("");
-  const [query, setQuery] = useState("");
-  const [hasMore, setHasMore] = useState(initialHasMore);
-  const [loading, setLoading] = useState(false);
+    const [questions, setQuestions] = useState(initialQuestions);
+    const [draft, setDraft] = useState("");
+    const [query, setQuery] = useState("");
+    const [hasMore, setHasMore] = useState(initialHasMore);
+    const [loading, setLoading] = useState(false);
 
-  const [hydrated, setHydrated] = useState(false);
+    const [answer, setAnswer] = useState("");
+    const [answerLoading, setAnswerLoading] = useState(false);
+
+    const [hydrated, setHydrated] = useState(false);
+ 
   useEffect(() => setHydrated(true), []);
 
   // Debounced search: wait 300ms after typing stops; each keystroke cancels
@@ -41,19 +45,59 @@ export default function QuestionsList({
     return () => clearTimeout(id); // cancel the pending timer on each keystroke
   }, [query]);
 
-  async function submit() {
-    if (!draft.trim()) return;
+ async function submit() {
+  if (!draft.trim()) return;
 
-    const res = await fetch("/api/questions", {
+  setAnswerLoading(true);
+
+  try {
+    // 1. Save question to Supabase
+    const saveRes = await fetch("/api/questions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body: draft }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        body: draft,
+      }),
     });
-    const created = await res.json();
 
-    setQuestions((qs) => [{ ...created, votes: 0 }, ...qs]);
+    const created = await saveRes.json();
+
+    // 2. Show the new question immediately on the page
+    setQuestions((qs) => [
+      {
+        ...created,
+        votes: 0,
+      },
+      ...qs,
+    ]);
+
+    // 3. Get AI answer from Groq
+    const aiRes = await fetch("/api/answer", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: draft,
+      }),
+    });
+
+    const aiData = await aiRes.json();
+
+    // 4. Display answer
+    setAnswer(aiData.answer);
+
+    // 5. Clear input box
     setDraft("");
+  } catch (error) {
+    console.error(error);
+    setAnswer("Failed to generate answer.");
   }
+
+  setAnswerLoading(false);
+}
 
   async function upvote(id: string) {
     // optimistic: assume success, update the UI now
@@ -104,6 +148,23 @@ export default function QuestionsList({
           </button>
         </div>
       </div>
+
+      {answerLoading && (
+        <div className="rounded-xl border p-4">
+          Generating answer...
+        </div>
+      )}
+
+      {answer && (
+        <div className="rounded-xl border p-4">
+          <h3 className="font-semibold mb-2">
+            AI Answer
+          </h3>
+          <p>{answer}</p>
+        </div>
+      )}
+
+      
 
       {/* Search + hydration status */}
       <div className="flex items-center gap-3">
